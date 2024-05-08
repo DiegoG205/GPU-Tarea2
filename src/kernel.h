@@ -7,4 +7,4 @@ typedef struct {
 
 void vec_sum(int* a, int* b, int* c, int n);
 
-void nbody_sec(int n, std::vector<pData> data, int steps);
+void nbody_sec(int n, std::vector<pData> &data, int steps);

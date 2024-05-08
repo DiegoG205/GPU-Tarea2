@@ -34,10 +34,9 @@ bool simulate(int N, int Steps) {
           .count();
 
   // Print the result
-  // std::cout << "RESULTS: " << std::endl;
-  // for (int i = 0; i < N; i++)
-  //   std::cout << "  out[" << i << "]: " << c[i] << " (" << a[i] << " + " << b[i]
-  //             << ")\n";
+  std::cout << "RESULTS: " << std::endl;
+  for (int i = 0; i < N; i++)
+    std::cout << "Particula " << i << " (" << data[i].x << ", " << data[i].y << ", " << data[i].z << ")\n";
 
   std::cout << "Time to create data: " << t.create_data << " microseconds\n";
   std::cout << "Time to execute kernel: " << t.execution << " microseconds\n";

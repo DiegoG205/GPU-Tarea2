@@ -11,12 +11,12 @@ __global__ void nbody_kernel(int n, float4 *data, int step) {
 
   // index for vertex (pos)
   unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
-  unsigned int x = 2*index;
-  unsigned int y = 2*index + 1;
+  unsigned int pos_index = 2*index;
+  unsigned int vel_index = 2*index + 1;
 
   // position and velocity (last frame)
-  float4 pos = data[x];
-  float4 vel = data[y];
+  float4 pos = data[pos_index];
+  float4 vel = data[vel_index];
   float3 r, acc;
 
   for (int i = 0; i < n; i++) {
@@ -28,7 +28,7 @@ __global__ void nbody_kernel(int n, float4 *data, int step) {
     double distSqr = r.x * r.x + r.y * r.y + r.z * r.z;
     double dist = std::sqrt(distSqr);
     double distCube = dist * dist * dist;
-    double s = pos.w / distCube;
+    double s = pos.w / (distCube + 0.1);
 
     acc.x += r.x * s;
     acc.y += r.y * s;
@@ -36,7 +36,6 @@ __global__ void nbody_kernel(int n, float4 *data, int step) {
 
   }
 
-  float4 p, v;
   vel.x += acc.x * step;
   vel.y += acc.y * step;
   vel.z += acc.z * step;
@@ -47,6 +46,6 @@ __global__ void nbody_kernel(int n, float4 *data, int step) {
 
   __syncthreads();
 
-  data[x] = pos;
-  data[y] = vel;
+  data[pos_index] = pos;
+  data[vel_index] = vel;
 };

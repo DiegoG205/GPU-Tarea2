@@ -9,7 +9,7 @@ void vec_sum(int* a, int* b, int* c, int n) {
   }
 };
 
-void nbody_sec(int n, std::vector<pData> data, int steps) {
+void nbody_sec(int n, std::vector<pData> &data, int steps) {
 
   std::vector<pData> temp(n);
   double dt = 0.1;
@@ -34,7 +34,7 @@ void nbody_sec(int n, std::vector<pData> data, int steps) {
         double dist = std::sqrt(distSqr);
         double distCube = dist * dist * dist;
 
-        double s = data[i].m / distCube;
+        double s = data[i].m / (distCube + 0.1);
 
         acc[0] += rx * s;
         acc[1] += ry * s;
@@ -49,16 +49,10 @@ void nbody_sec(int n, std::vector<pData> data, int steps) {
       temp[i] = {data[i].x + vx*k, data[i].y + vy*k, data[i].z + vz*k, data[i].m, vx, vy, vz};
     }
 
-    std::cout << "Step: " << k << "\n";
+    //std::cout << "Step: " << k << "\n";
     for (int i = 0; i < n; i++) {
       data[i] = temp[i];
-      std::cout << "P " << i << ": (" << data[i].x << "," << data[i].y << "," << data[i].z << ")\n";
+      //std::cout << "P " << i << ": (" << data[i].x << "," << data[i].y << "," << data[i].z << ")\n";
     }
   }
-
-  std::cout << "Simulation finished\n";
-  for (int i = 0; i < n; i++) {
-    std::cout << "P " << i << ": (" << data[i].x << "," << data[i].y << "," << data[i].z << ")\n";
-  }
-
 };
