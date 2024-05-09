@@ -89,17 +89,40 @@ __global__ void nbody_kernel(int n, float4 *data, int steps) {
     pos.z += vel.z;
 
     __syncthreads();
-    //cudaDeviceSynchronize();
 
     data[pos_index] = pos;
     data[vel_index] = vel;
+
+    __syncthreads();
   }
 
 };
 
-__global__ void nbody_kernel_shared(int n, float4 *data, int steps) {
+__device__ float3 batch_calculation(float4 pos, float3 acc, float4* data, int bsize) {
+  
+  float4 r;
+  for (int i = 0; i < bsize; i++) {
+    r = data[i];
+    r.x -= pos.x;
+    r.y -= pos.y;
+    r.z -= pos.z;
 
-  // index for vertex (pos)
+    double distSqr = r.x * r.x + r.y * r.y + r.z * r.z + 0.1;
+    double dist = std::sqrt(distSqr);
+    double distCube = dist * dist * dist;
+    double s = r.w / distCube;
+
+    acc.x += r.x * s;
+    acc.y += r.y * s;
+    acc.z += r.z * s;
+  }
+  return acc;
+}
+
+__global__ void nbody_kernel_shared(int n, float4 *data, int steps, int bsize, int bnum) {
+
+  __shared__ float4 batchData[32];
+
   unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
   unsigned int pos_index = 2*index;
   unsigned int vel_index = 2*index + 1;
@@ -108,24 +131,17 @@ __global__ void nbody_kernel_shared(int n, float4 *data, int steps) {
     // position and velocity (last frame)
     float4 pos = data[pos_index];
     float4 vel = data[vel_index];
-    float4 r, acc;
+    float3 acc;
 
-    for (int i = 0; i < n; i++) {
+    for (int i = 0; i < bnum; i++) {
 
-      r = data[i];
-      r.x -= pos.x;
-      r.y -= pos.y;
-      r.z -= pos.z;
+      batchData[threadIdx.x] = data[threadIdx.x + i * blockDim.x];
 
-      double distSqr = r.x * r.x + r.y * r.y + r.z * r.z + 0.1;
-      double dist = std::sqrt(distSqr);
-      double distCube = dist * dist * dist;
-      double s = r.w / distCube;
+      __syncthreads();
 
-      acc.x += r.x * s;
-      acc.y += r.y * s;
-      acc.z += r.z * s;
+      acc = batch_calculation(pos, acc, batchData, bsize);
 
+      __syncthreads();
     }
 
     vel.x += acc.x;
@@ -137,10 +153,11 @@ __global__ void nbody_kernel_shared(int n, float4 *data, int steps) {
     pos.z += vel.z;
 
     __syncthreads();
-    //cudaDeviceSynchronize();
 
     data[pos_index] = pos;
     data[vel_index] = vel;
+
+    __syncthreads();
   }
 
 };

@@ -58,16 +58,16 @@ bool simulate(int N, int Steps, int blockSize, int gridSize) {
 
   // Execute the function on the device (using 32 threads here)
   t_start = std::chrono::high_resolution_clock::now();
-  nbody_kernel_full<<<blockSize, gridSize>>>(N, dataDev, Steps);
+
+  // No shared memory
+
+  // nbody_kernel<<<blockSize, gridSize>>>(N, dataDev, Steps);
+  // cudaDeviceSynchronize();
+
+  // Shared memory
+
+  nbody_kernel_shared<<<blockSize, gridSize>>>(N, dataDev, Steps, blockSize, gridSize);
   cudaDeviceSynchronize();
-  // for (int i = 0; i < Steps; i++) {
-  //   nbody_kernel<<<blockSize, gridSize>>>(N, dataDev, i);
-  //   cudaDeviceSynchronize();
-  //   // cudaMemcpy(data.data(), dataDev, size, cudaMemcpyDeviceToHost);
-  //   // std::cout << " Step " << i << '\n';
-  //   //   for (int j = 0; j < N; j++)
-  //   //     std::cout << " Particula " << j << ": (" << data[2*j].x << ", " << data[2*j].y << ", " << data[2*j].z << ")\n";
-  // }
   
   t_end = std::chrono::high_resolution_clock::now();
   t.execution =
