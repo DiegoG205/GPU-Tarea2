@@ -25,16 +25,16 @@ void nbody_sec(int n, std::vector<pData> &data, int steps) {
 
         double rx,ry,rz;
 
-        rx = data[i].x - data[j].x;
-        ry = data[i].y - data[j].y;
-        rz = data[i].z - data[j].z;
+        rx = data[j].x - data[i].x;
+        ry = data[j].y - data[i].y;
+        rz = data[j].z - data[i].z;
 
-        double distSqr = rx * rx + ry * ry + rz * rz;
+        double distSqr = rx * rx + ry * ry + rz * rz + 0.1;
 
         double dist = std::sqrt(distSqr);
         double distCube = dist * dist * dist;
 
-        double s = data[i].m / (distCube + 0.1);
+        double s = data[j].m / distCube;
 
         acc[0] += rx * s;
         acc[1] += ry * s;
@@ -42,11 +42,11 @@ void nbody_sec(int n, std::vector<pData> &data, int steps) {
       }
 
       double vx, vy, vz;
-      vx = data[i].vx + acc[0] * k;
-      vy = data[i].vy + acc[1] * k;
-      vz = data[i].vz + acc[2] * k;
+      vx = data[i].vx + acc[0];// * k;
+      vy = data[i].vy + acc[1];// * k;
+      vz = data[i].vz + acc[2];// * k;
 
-      temp[i] = {data[i].x + vx*k, data[i].y + vy*k, data[i].z + vz*k, data[i].m, vx, vy, vz};
+      temp[i] = {data[i].x + vx, data[i].y + vy, data[i].z + vz, data[i].m, vx, vy, vz};
     }
 
     //std::cout << "Step: " << k << "\n";

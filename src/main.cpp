@@ -2,6 +2,7 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
+#include <ctime>
 
 #include "kernel.h"
 
@@ -16,6 +17,8 @@ Times t;
 
 bool simulate(int N, int Steps) {
   using std::chrono::microseconds;
+  std::srand(std::time(0));
+
   std::vector<pData> data(N);
 
   auto t_start = std::chrono::high_resolution_clock::now();
