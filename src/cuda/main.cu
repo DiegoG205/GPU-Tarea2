@@ -19,25 +19,28 @@ struct Times {
 
 Times t;
 
-bool simulate(int N, int Steps, int blockSize, int gridSize) {
+bool simulate(int N, int Steps, int blockSize, int sharedMem, int seed) {
   using std::chrono::microseconds;
 
-  std::srand(std::time(0));
+  if (!seed) std::srand(std::time(0));
+  else std::srand(seed);
 
   std::size_t size = sizeof(float4) * N * 2;
   std::vector<float4> data(2*N);
 
   // Create the memory buffers
   float4 *dataDev;
+  float4 *auxDev;
   cudaMalloc(&dataDev, size);
+  cudaMalloc(&auxDev, size);
 
   // Assign values to host variables
   auto t_start = std::chrono::high_resolution_clock::now();
   for (int i = 0; i < N; i++) {
-    data[2*i].x = std::rand() % 1000;
-    data[2*i].y = std::rand() % 1000;
-    data[2*i].z = std::rand() % 1000;
-    data[2*i].w = std::rand() % 25000 + 50000;
+    data[2*i].x = float(std::rand() % 1000);
+    data[2*i].y = float(std::rand() % 1000);
+    data[2*i].z = float(std::rand() % 1000);
+    data[2*i].w = float(std::rand() % 25000 + 50000);
     data[2*i + 1] = {0,0,0,0};
   }
   auto t_end = std::chrono::high_resolution_clock::now();
@@ -46,7 +49,7 @@ bool simulate(int N, int Steps, int blockSize, int gridSize) {
 
   std::cout << "INITIAL: " << std::endl;
   for (int i = 0; i < N; i++)
-    std::cout << " Particula " << i << ": (" << data[2*i].x << ", " << data[2*i].y << ", " << data[2*i].z << ")\n";
+    std::cout << " Particula " << i << ": (" << data[2*i].x << ", " << data[2*i].y << ", " << data[2*i].z << ") m = " << data[2*i].w << "\n";
 
   // Copy values from host variables to device
   t_start = std::chrono::high_resolution_clock::now();
@@ -56,18 +59,34 @@ bool simulate(int N, int Steps, int blockSize, int gridSize) {
       std::chrono::duration_cast<microseconds>(t_end - t_start).count();
 
 
+  int gridSize = (N + blockSize - 1)/blockSize;
+
   // Execute the function on the device (using 32 threads here)
-  t_start = std::chrono::high_resolution_clock::now();
 
-  // No shared memory
 
-  // nbody_kernel<<<blockSize, gridSize>>>(N, dataDev, Steps);
-  // cudaDeviceSynchronize();
-
-  // Shared memory
-
-  nbody_kernel_shared<<<blockSize, gridSize>>>(N, dataDev, Steps, blockSize, gridSize);
-  cudaDeviceSynchronize();
+  if (sharedMem) {
+    // Shared memory
+    std::cout << "Using shared memory: \n";
+    t_start = std::chrono::high_resolution_clock::now();
+    nbody_kernel_shared<<<blockSize, gridSize, (sizeof(float4)*blockSize)>>>(N, dataDev, Steps, blockSize, gridSize);
+    cudaDeviceSynchronize();
+  } 
+  else {
+    // No shared memory
+    std::cout << "Not using shared memory: \n";
+    t_start = std::chrono::high_resolution_clock::now();
+    // for (int i = 0; i < Steps; i++)
+    // {
+    //   nbody_kernel<<<blockSize, gridSize>>>(N, dataDev, auxDev);
+    //   //cudaMemcpy(dataDev, auxDev, size, cudaMemcpyDeviceToDevice);
+    //   cudaMemcpy(data.data(), auxDev, size, cudaMemcpyDeviceToHost);
+    //   cudaMemcpy(dataDev, data.data(), size, cudaMemcpyHostToDevice);
+    //   std::cout << "Step Finished\n";
+    // }
+    
+    nbody_kernel<<<blockSize, gridSize>>>(N, dataDev, Steps);
+    cudaDeviceSynchronize();
+  }
   
   t_end = std::chrono::high_resolution_clock::now();
   t.execution =
@@ -81,7 +100,7 @@ bool simulate(int N, int Steps, int blockSize, int gridSize) {
       std::chrono::duration_cast<std::chrono::microseconds>(t_end - t_start).count();
 
   // Print the result
-  std::cout << "RESULTS: " << std::endl;
+  std::cout << "RESULTS: \n";
   for (int i = 0; i < N; i++)
     std::cout << " Particula " << i << ": (" << data[2*i].x << ", " << data[2*i].y << ", " << data[2*i].z << ")\n";
 
@@ -95,23 +114,26 @@ bool simulate(int N, int Steps, int blockSize, int gridSize) {
             << " microseconds\n";
 
   cudaFree(dataDev);
+  cudaFree(auxDev);
 
   return true;
 
 }
 
 int main(int argc, char* argv[]) {
-  if (argc != 5) {
-    std::cerr << "Uso: " << argv[0] << " <array size> <step_count> <block size> <grid size>"
+  if (argc != 5 && argc != 6) {
+    std::cerr << "Uso: " << argv[0] << " <particle_count> <step_count> <block size> <shared_mem> <seed (optional)>"
               << std::endl;
     return 2;
   }
   int n = std::atoi(argv[1]);
   int s = std::atoi(argv[2]);
   int bs = std::atoi(argv[3]);
-  int gs = std::atoi(argv[4]);
+  int shm = std::atoi(argv[4]);
+  int seed = 0;
+  if (argc == 6) seed = std::atoi(argv[5]);
 
-  if (!simulate(n, s, bs, gs)) {
+  if (!simulate(n, s, bs, shm, seed)) {
     std::cerr << "CUDA: Error while executing the simulation" << std::endl;
     return 3;
   }

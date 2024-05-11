@@ -15,19 +15,27 @@ struct Times {
 
 Times t;
 
-bool simulate(int N, int Steps) {
+bool simulate(int N, int Steps, int seed) {
   using std::chrono::microseconds;
-  std::srand(std::time(0));
+  if (!seed) {
+    std::cout << "Random seed\n";
+    std::srand(std::time(0));
+  } 
+  else std::srand(seed);
 
   std::vector<pData> data(N);
 
   auto t_start = std::chrono::high_resolution_clock::now();
   for (int i = 0; i < N; i++) {
-    data[i] = {double(std::rand() % 1000), double(std::rand() % 1000), double(std::rand() % 1000), double(std::rand() % 25000 + 50000), 0, 0, 0};
+    data[i] = {float(std::rand() % 1000), float(std::rand() % 1000), float(std::rand() % 1000), float(std::rand() % 25000 + 50000), 0, 0, 0};
   }
   auto t_end = std::chrono::high_resolution_clock::now();
   t.create_data =
       std::chrono::duration_cast<microseconds>(t_end - t_start).count();
+
+  std::cout << "INITIAL: " << std::endl;
+  for (int i = 0; i < N; i++)
+    std::cout << "Particula " << i << " (" << data[i].x << ", " << data[i].y << ", " << data[i].z << ") m = " << data[i].m << "\n";
 
   t_start = std::chrono::high_resolution_clock::now();
   nbody_sec(N, data, Steps);
@@ -50,15 +58,17 @@ bool simulate(int N, int Steps) {
 }
 
 int main(int argc, char* argv[]) {
-  if (argc != 3) {
-    std::cerr << "Uso: " << argv[0] << " <particle_count> <step_amount>"
+  if (argc != 3 && argc != 4) {
+    std::cerr << "Uso: " << argv[0] << " <particle_count> <step_amount> <seed (optional)>"
               << std::endl;
     return 2;
   }
 
   int n = std::stoi(argv[1]);
   int s = std::stoi(argv[2]);
-  if (!simulate(n, s)) {
+  int seed = 0;
+  if (argc == 4) seed = std::stoi(argv[3]);
+  if (!simulate(n, s, seed)) {
     std::cerr << "Error while executing the simulation" << std::endl;
     return 3;
   }
