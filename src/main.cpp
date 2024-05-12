@@ -59,8 +59,8 @@ bool simulate(int N, int Steps, int seed) {
 }
 
 int main(int argc, char* argv[]) {
-  if (argc != 3 && argc != 4) {
-    std::cerr << "Uso: " << argv[0] << " <particle_count> <step_amount> <seed (optional)>"
+  if (argc != 4 && argc != 5) {
+    std::cerr << "Uso: " << argv[0] << " <particle_count> <step_amount> <output_file> <seed (optional)>"
               << std::endl;
     return 2;
   }
@@ -68,21 +68,20 @@ int main(int argc, char* argv[]) {
   int n = std::stoi(argv[1]);
   int s = std::stoi(argv[2]);
   int seed = 0;
-  if (argc == 4) seed = std::stoi(argv[3]);
+  if (argc == 5) seed = std::stoi(argv[4]);
   if (!simulate(n, s, seed)) {
     std::cerr << "Error while executing the simulation" << std::endl;
     return 3;
   }
 
-  // std::ofstream out;
-  // out.open(argv[2], std::ios::app | std::ios::out);
-  // if (!out.is_open()) {
-  //   std::cerr << "Error while opening file: '" << argv[2] << "'" << std::endl;
-  //   return 4;
-  // }
-  // out << n << "," << t.create_data << "," << t.execution << "," << t.total()
-  //     << "\n";
+  std::ofstream out;
+  out.open(argv[3], std::ios::app | std::ios::out);
+  if (!out.is_open()) {
+    std::cerr << "Error while opening file: '" << argv[3] << "'" << std::endl;
+    return 4;
+  }
+  out << n << "," << s << "," << t.total() << "\n";
 
-  // std::cout << "Data written to " << argv[2] << std::endl;
+  std::cout << "Data written to " << argv[3] << std::endl;
   return 0;
 }
