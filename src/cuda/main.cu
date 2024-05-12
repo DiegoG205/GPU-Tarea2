@@ -25,23 +25,27 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int seed) {
   if (!seed) std::srand(std::time(0));
   else std::srand(seed);
 
-  std::size_t size = sizeof(float4) * N * 2;
-  std::vector<float4> data(2*N);
+  std::size_t pos_size = sizeof(int4) * N;
+  std::size_t vel_size = sizeof(double4) * N;
+  std::vector<int4> posData(N);
+  std::vector<double4> velData(N);
 
   // Create the memory buffers
-  float4 *dataDev;
-  float4 *auxDev;
-  cudaMalloc(&dataDev, size);
-  cudaMalloc(&auxDev, size);
+  int4 *posDev;
+  double4 *velDev;
+  //double4 *auxDev;
+  cudaMalloc(&posDev, pos_size);
+  cudaMalloc(&velDev, vel_size);
+  //cudaMalloc(&auxDev, size);
 
   // Assign values to host variables
   auto t_start = std::chrono::high_resolution_clock::now();
   for (int i = 0; i < N; i++) {
-    data[2*i].x = float(std::rand() % 1000);
-    data[2*i].y = float(std::rand() % 1000);
-    data[2*i].z = float(std::rand() % 1000);
-    data[2*i].w = float(std::rand() % 25000 + 50000);
-    data[2*i + 1] = {0,0,0,0};
+    posData[i].x = (std::rand() % 10000);
+    posData[i].y = (std::rand() % 10000);
+    posData[i].z = (std::rand() % 10000);
+    posData[i].w = (std::rand() % 25000 + 50000);
+    velData[i] = {0,0,0,0};
   }
   auto t_end = std::chrono::high_resolution_clock::now();
   t.create_data =
@@ -49,11 +53,12 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int seed) {
 
   std::cout << "INITIAL: " << std::endl;
   for (int i = 0; i < N; i++)
-    std::cout << " Particula " << i << ": (" << data[2*i].x << ", " << data[2*i].y << ", " << data[2*i].z << ") m = " << data[2*i].w << "\n";
+    std::cout << " Particula " << i << ": (" << posData[i].x << ", " << posData[i].y << ", " << posData[i].z << ") m = " << posData[i].w << "\n";
 
   // Copy values from host variables to device
   t_start = std::chrono::high_resolution_clock::now();
-  cudaMemcpy(dataDev, data.data(), size, cudaMemcpyHostToDevice);
+  cudaMemcpy(posDev, posData.data(), pos_size, cudaMemcpyHostToDevice);
+  cudaMemcpy(velDev, velData.data(), pos_size, cudaMemcpyHostToDevice);
   t_end = std::chrono::high_resolution_clock::now();
   t.copy_to_device =
       std::chrono::duration_cast<microseconds>(t_end - t_start).count();
@@ -68,23 +73,15 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int seed) {
     // Shared memory
     std::cout << "Using shared memory: \n";
     t_start = std::chrono::high_resolution_clock::now();
-    nbody_kernel_shared<<<blockSize, gridSize, (sizeof(float4)*blockSize)>>>(N, dataDev, Steps, blockSize, gridSize);
+    nbody_kernel_shared<<<blockSize, gridSize, (sizeof(int4)*blockSize)>>>(N, posDev, velDev, Steps, blockSize, gridSize);
     cudaDeviceSynchronize();
   } 
   else {
     // No shared memory
     std::cout << "Not using shared memory: \n";
     t_start = std::chrono::high_resolution_clock::now();
-    // for (int i = 0; i < Steps; i++)
-    // {
-    //   nbody_kernel<<<blockSize, gridSize>>>(N, dataDev, auxDev);
-    //   //cudaMemcpy(dataDev, auxDev, size, cudaMemcpyDeviceToDevice);
-    //   cudaMemcpy(data.data(), auxDev, size, cudaMemcpyDeviceToHost);
-    //   cudaMemcpy(dataDev, data.data(), size, cudaMemcpyHostToDevice);
-    //   std::cout << "Step Finished\n";
-    // }
     
-    nbody_kernel<<<blockSize, gridSize>>>(N, dataDev, Steps);
+    nbody_kernel<<<blockSize, gridSize>>>(N, posDev, velDev, Steps);
     cudaDeviceSynchronize();
   }
   
@@ -94,7 +91,7 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int seed) {
 
   // Copy the output variable from device to host
   t_start = std::chrono::high_resolution_clock::now();
-  cudaMemcpy(data.data(), dataDev, size, cudaMemcpyDeviceToHost);
+  cudaMemcpy(posData.data(), posDev, pos_size, cudaMemcpyDeviceToHost);
   t_end = std::chrono::high_resolution_clock::now();
   t.copy_to_host =
       std::chrono::duration_cast<std::chrono::microseconds>(t_end - t_start).count();
@@ -102,7 +99,7 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int seed) {
   // Print the result
   std::cout << "RESULTS: \n";
   for (int i = 0; i < N; i++)
-    std::cout << " Particula " << i << ": (" << data[2*i].x << ", " << data[2*i].y << ", " << data[2*i].z << ")\n";
+    std::cout << " Particula " << i << ": (" << posData[i].x << ", " << posData[i].y << ", " << posData[i].z << ")\n";
 
   std::cout << "Time to create data: " << t.create_data << " microseconds\n";
   std::cout << "Time to copy data to device: " << t.copy_to_device
@@ -113,8 +110,9 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int seed) {
   std::cout << "Time to execute the whole program: " << t.total()
             << " microseconds\n";
 
-  cudaFree(dataDev);
-  cudaFree(auxDev);
+  cudaFree(posDev);
+  cudaFree(velDev);
+  //cudaFree(auxDev);
 
   return true;
 

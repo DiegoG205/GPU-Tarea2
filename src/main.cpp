@@ -24,10 +24,11 @@ bool simulate(int N, int Steps, int seed) {
   else std::srand(seed);
 
   std::vector<pData> data(N);
+  std::vector<pData> aux(N);
 
   auto t_start = std::chrono::high_resolution_clock::now();
   for (int i = 0; i < N; i++) {
-    data[i] = {float(std::rand() % 1000), float(std::rand() % 1000), float(std::rand() % 1000), float(std::rand() % 25000 + 50000), 0, 0, 0};
+    data[i] = {(std::rand() % 10000), (std::rand() % 10000), (std::rand() % 10000), (std::rand() % 50000 + 50000), 0, 0, 0};
   }
   auto t_end = std::chrono::high_resolution_clock::now();
   t.create_data =
