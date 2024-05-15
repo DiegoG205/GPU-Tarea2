@@ -1,10 +1,8 @@
 #include <vector>
 
 typedef struct {
-    float x, y, z, m, vx, vy, vz;
+    int x, y, z, m;
+    double vx, vy, vz;
 } pData;
-
-
-void vec_sum(int* a, int* b, int* c, int n);
 
 void nbody_sec(int n, std::vector<pData> &data, int steps);
