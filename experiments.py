@@ -4,7 +4,7 @@ import subprocess
 
 n = 8
 s = 1000
-c = 3
+c = 5
 t = 64
 
 fs = open("outSeq.txt", "wt")
@@ -20,7 +20,7 @@ fc2d = open("outCuda2D.txt", "wt")
 fc2d.write("n,steps,threads,time\n")
 fc2d.close()
 
-for i in range(0, 4): # 7 iteraciones llega hasta n=1024
+for i in range(0, 5): # 7 iteraciones llega hasta n=1024
     n *= 2
     print(f'Using {n} particles:')
     for j in range(0, c):
