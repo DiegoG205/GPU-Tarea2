@@ -1,6 +1,53 @@
 #include "kernel.cuh"
 #include <stdio.h>
 
+__global__ void test(int n, double4 *posData, double4 *posAux, double4 *velData, double4 *velAux, int steps) {
+
+  while(steps--) {
+    for (int j = 0; j < n; j++) {
+      // position and velocity (last frame)
+      double4 pos = posData[j];
+      double4 vel = velData[j];
+
+      double4 r;
+      double4 acc;
+
+      for (int i = 0; i < n; i++) {
+
+        r = posData[i];
+        r.x = r.x - pos.x;
+        r.y = r.y - pos.y;
+        r.z = r.z - pos.z;
+
+        double distSqr = r.x * r.x + r.y * r.y + r.z * r.z + 0.1;
+        double dist = std::sqrt(distSqr);
+        double distCube = dist * dist * dist;
+        double s = r.w / distCube;
+
+        acc.x = acc.x + r.x * s;
+        acc.y = acc.y + r.y * s;
+        acc.z = acc.z + r.z * s;
+      }
+      vel.x = vel.x + acc.x;
+      vel.y = vel.y + acc.y;
+      vel.z = vel.z + acc.z;
+
+      pos.x = pos.x + vel.x;
+      pos.y = pos.y + vel.y;
+      pos.z = pos.z + vel.z;
+
+      posAux[j] = pos;
+      velAux[j] = vel;
+    }
+
+    for (int i = 0; i < n; i++) {
+      posData[i] = posAux[i];
+      velData[i] = velAux[i];
+    }
+  }
+
+};
+
 __global__ void nbody_kernel(int n, double4 *posData, double4 *velData, int steps) {
 
   unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -53,6 +100,57 @@ __global__ void nbody_kernel(int n, double4 *posData, double4 *velData, int step
 
   }
 
+};
+
+__global__ void nbody_kernel_single(int n, double4 *posData, double4 *posAux, double4 *velData, double4 *velAux) {
+
+  unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
+  // position and velocity (last frame)
+  double4 pos = posData[index];
+  double4 vel = velData[index];
+
+  double4 r;
+  double4 acc;
+
+  for (int i = 0; i < n; i++) {
+
+    r = posData[i];
+    r.x = r.x - pos.x;
+    r.y = r.y - pos.y;
+    r.z = r.z - pos.z;
+
+    double distSqr = r.x * r.x + r.y * r.y + r.z * r.z + 0.1;
+    double dist = std::sqrt(distSqr);
+    double distCube = dist * dist * dist;
+    double s = r.w / distCube;
+
+    acc.x = acc.x + r.x * s;
+    acc.y = acc.y + r.y * s;
+    acc.z = acc.z + r.z * s;
+
+    // No tengo idea de por que, pero este print a veces evita que la simulacion explote
+    //printf("");
+  }
+
+  vel.x = vel.x + acc.x;
+  vel.y = vel.y + acc.y;
+  vel.z = vel.z + acc.z;
+
+  pos.x = pos.x + vel.x;
+  pos.y = pos.y + vel.y;
+  pos.z = pos.z + vel.z;
+
+  //__syncthreads();
+  // __threadfence_system();
+
+  posAux[index] = pos;
+  velAux[index] = vel;
+};
+
+__global__ void nbody_copy(double4 *posData, double4 *posAux, double4 *velData, double4 *velAux) {
+  unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
+  posData[index] = posAux[index];
+  velData[index] = velAux[index];
 };
 
 __device__ float3 batch_calculation(double4 pos, float3 acc, double4* data, int bsize) {

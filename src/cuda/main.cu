@@ -5,6 +5,7 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
+#include <random>
 #include "kernel.cuh"
 
 struct Times {
@@ -22,8 +23,16 @@ Times t;
 bool simulate(int N, int Steps, int blockSize, int sharedMem, int threads2D, int seed) {
   using std::chrono::microseconds;
 
-  if (!seed) std::srand(std::time(0));
-  else std::srand(seed);
+  cudaSetDevice(0);
+
+  std::default_random_engine gen;
+
+  if (!seed) {
+    std::cout << "Random seed\n";
+    gen.seed(std::time(0));
+    //std::srand(std::time(0));
+  } 
+  else gen.seed(seed);//std::srand(seed);
 
   std::size_t pos_size = sizeof(double4) * N;
   std::size_t vel_size = sizeof(double4) * N;
@@ -33,18 +42,26 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int threads2D, int
   // Create the memory buffers
   double4 *posDev;
   double4 *velDev;
+  double4 *auxPosDev;
+  double4 *auxVelDev;
   cudaMalloc(&posDev, pos_size);
+  cudaMalloc(&auxPosDev, pos_size);
   cudaMalloc(&velDev, vel_size);
+  cudaMalloc(&auxVelDev, vel_size);
 
   // Assign values to host variables
   auto t_start = std::chrono::high_resolution_clock::now();
+
+  std::uniform_real_distribution<double> pos(0.0, 10000.0);
+  std::uniform_real_distribution<double> mass(50000.0, 100000.0);
+
   for (int i = 0; i < N; i++) {
-    posData[i].x = double(std::rand() % 10000);
-    posData[i].y = double(std::rand() % 10000);
-    posData[i].z = double(std::rand() % 10000);
-    posData[i].w = double(std::rand() % 25000 + 50000);
-    velData[i] = {0,0,0,0};
+    posData[i].x = pos(gen);
+    posData[i].y = pos(gen);
+    posData[i].z = pos(gen);
+    posData[i].w = mass(gen);
   }
+  for (int i = 0; i < N; i++) velData[i] = {0,0,0,0};
   auto t_end = std::chrono::high_resolution_clock::now();
   t.create_data =
       std::chrono::duration_cast<microseconds>(t_end - t_start).count();
@@ -60,6 +77,11 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int threads2D, int
   t_end = std::chrono::high_resolution_clock::now();
   t.copy_to_device =
       std::chrono::duration_cast<microseconds>(t_end - t_start).count();
+
+  t_start = std::chrono::high_resolution_clock::now();
+      
+  // test<<<1, 1>>>(N, posDev, auxPosDev, velDev, auxVelDev, Steps);
+  // cudaDeviceSynchronize();
 
   if (threads2D) {
     const dim3 threads(8, 8, 1);
@@ -88,9 +110,16 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int threads2D, int
       // No shared memory
       std::cout << "Not using shared memory: \n";
       t_start = std::chrono::high_resolution_clock::now();
+
+      while(Steps--){
+        nbody_kernel_single<<<blockSize, gridSize>>>(N, posDev, auxPosDev, velDev, auxVelDev);
+        cudaDeviceSynchronize();
+        nbody_copy<<<blockSize, gridSize>>>(posDev, auxPosDev, velDev, auxVelDev);
+        cudaDeviceSynchronize();
+      }
       
-      nbody_kernel<<<blockSize, gridSize>>>(N, posDev, velDev, Steps);
-      cudaDeviceSynchronize();
+      // nbody_kernel<<<blockSize, gridSize>>>(N, posDev, velDev, Steps);
+      // cudaDeviceSynchronize();
     }
   }
   
@@ -120,7 +149,9 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int threads2D, int
             << " microseconds\n";
 
   cudaFree(posDev);
+  cudaFree(auxPosDev);
   cudaFree(velDev);
+  cudaFree(auxVelDev);
 
   return true;
 
@@ -138,7 +169,7 @@ int main(int argc, char* argv[]) {
   int shm = std::atoi(argv[4]);
   int th2d = std::atoi(argv[5]);
   int seed = 0;
-  if (argc == 7) seed = std::atoi(argv[7]);
+  if (argc == 8) seed = std::atoi(argv[7]);
 
   if (!simulate(n, s, bs, shm, th2d, seed)) {
     std::cerr << "CUDA: Error while executing the simulation" << std::endl;
