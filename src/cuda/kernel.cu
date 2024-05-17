@@ -1,68 +1,179 @@
 #include "kernel.cuh"
 #include <stdio.h>
 
-__global__ void test(int n, double4 *posData, double4 *posAux, double4 *velData, double4 *velAux, int steps) {
+// __global__ void nbody_kernel(int n, double4 *posData, double4 *velData, int steps) {
 
-  while(steps--) {
-    for (int j = 0; j < n; j++) {
-      // position and velocity (last frame)
-      double4 pos = posData[j];
-      double4 vel = velData[j];
+//   unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
 
-      double4 r;
-      double4 acc;
+//   while(steps--) {
+//     // position and velocity (last frame)
+//     double4 pos = posData[index];
+//     double4 vel = velData[index];
 
-      for (int i = 0; i < n; i++) {
+//     double4 r;
+//     double4 acc = {0,0,0,0};
 
-        r = posData[i];
-        r.x = r.x - pos.x;
-        r.y = r.y - pos.y;
-        r.z = r.z - pos.z;
+//     for (int i = 0; i < n; i++) {
 
-        double distSqr = r.x * r.x + r.y * r.y + r.z * r.z + 0.1;
-        double dist = std::sqrt(distSqr);
-        double distCube = dist * dist * dist;
-        double s = r.w / distCube;
+//       r = posData[i];
+//       r.x = r.x - pos.x;
+//       r.y = r.y - pos.y;
+//       r.z = r.z - pos.z;
 
-        acc.x = acc.x + r.x * s;
-        acc.y = acc.y + r.y * s;
-        acc.z = acc.z + r.z * s;
-      }
-      vel.x = vel.x + acc.x;
-      vel.y = vel.y + acc.y;
-      vel.z = vel.z + acc.z;
+//       double distSqr = r.x * r.x + r.y * r.y + r.z * r.z + 0.1;
+//       double dist = std::sqrt(distSqr);
+//       double distCube = dist * dist * dist;
+//       double s = r.w / distCube;
 
-      pos.x = pos.x + vel.x;
-      pos.y = pos.y + vel.y;
-      pos.z = pos.z + vel.z;
+//       acc.x = acc.x + r.x * s;
+//       acc.y = acc.y + r.y * s;
+//       acc.z = acc.z + r.z * s;
 
-      posAux[j] = pos;
-      velAux[j] = vel;
-    }
+//       // No tengo idea de por que, pero este print a veces evita que la simulacion explote
+//       printf("");
 
-    for (int i = 0; i < n; i++) {
-      posData[i] = posAux[i];
-      velData[i] = velAux[i];
-    }
-  }
 
-};
+//     }
 
-__global__ void nbody_kernel(int n, double4 *posData, double4 *velData, int steps) {
+//     vel.x = vel.x + acc.x;
+//     vel.y = vel.y + acc.y;
+//     vel.z = vel.z + acc.z;
+
+//     pos.x = pos.x + vel.x;
+//     pos.y = pos.y + vel.y;
+//     pos.z = pos.z + vel.z;
+
+//     __syncthreads();
+//     __threadfence_system();
+
+//     posData[index] = pos;
+//     velData[index] = vel;
+
+//     //printf("Particula %d: (%f,%f,%f)\n", index, vel.x, vel.y, vel.z);
+
+//   }
+
+// };
+
+__global__ void nbody_kernel(int n, double4 *posData, double4 *posAux, double4 *velData, double4 *velAux) {
 
   unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
+  // position and velocity (last frame)
+  double4 pos = posData[index];
+  double4 vel = velData[index];
 
-  while(steps--) {
-    // position and velocity (last frame)
-    double4 pos = posData[index];
-    double4 vel = velData[index];
+  double4 r;
+  double3 acc = {0,0,0};
 
-    double4 r;
-    double4 acc;
+  for (int i = 0; i < n; i++) {
 
-    for (int i = 0; i < n; i++) {
+    r = posData[i];
+    r.x = r.x - pos.x;
+    r.y = r.y - pos.y;
+    r.z = r.z - pos.z;
 
-      r = posData[i];
+    double distSqr = r.x * r.x + r.y * r.y + r.z * r.z + 0.1;
+    double dist = std::sqrt(distSqr);
+    double distCube = dist * dist * dist;
+    double s = r.w / distCube;
+
+    acc.x = acc.x + r.x * s;
+    acc.y = acc.y + r.y * s;
+    acc.z = acc.z + r.z * s;
+
+  }
+
+  vel.x = vel.x + acc.x;
+  vel.y = vel.y + acc.y;
+  vel.z = vel.z + acc.z;
+
+  pos.x = pos.x + vel.x;
+  pos.y = pos.y + vel.y;
+  pos.z = pos.z + vel.z;
+  
+  posAux[index] = pos;
+  velAux[index] = vel;
+};
+
+__device__ double3 batch_calculation(double4 pos, double3 acc, double4* data, int bsize) {
+  
+  double4 r;
+  for (int i = 0; i < blockDim.x; i++) {
+    r = data[i];
+    r.x = r.x - pos.x;
+    r.y = r.y - pos.y;
+    r.z = r.z - pos.z;
+
+    double distSqr = r.x * r.x + r.y * r.y + r.z * r.z + 0.1;
+    double dist = std::sqrt(distSqr);
+    double distCube = dist * dist * dist;
+    double s = r.w / distCube;
+
+    acc.x = acc.x + r.x * s;
+    acc.y = acc.y + r.y * s;
+    acc.z = acc.z + r.z * s;
+  }
+  return acc;
+}
+
+extern __shared__ double4 batchData[];
+// __global__ void nbody_kernel_shared(int n, double4 *posData, double4 *velData, int steps, int bsize, int bnum) {
+
+//   unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
+
+//   while(steps--) {
+//     // position and velocity (last frame)
+//     double4 pos = posData[index];
+//     double4 vel = velData[index];
+//     float3 acc;
+
+//     for (int i = 0; i < bnum; i++) {
+
+//       batchData[threadIdx.x] = posData[threadIdx.x + i * blockDim.x];
+
+//       __syncthreads();
+
+//       acc = batch_calculation(pos, acc, batchData, bsize);
+
+//       __syncthreads();
+//     }
+
+//     vel.x += acc.x;
+//     vel.y += acc.y;
+//     vel.z += acc.z;
+
+//     pos.x += vel.x;
+//     pos.y += vel.y;
+//     pos.z += vel.z;
+
+//     __syncthreads();
+//     __threadfence_system();
+
+//     posData[index] = pos;
+//     velData[index] = vel;
+
+//     __syncthreads();
+//   }
+
+// };
+
+__global__ void nbody_kernel_shared(int n, double4 *posData, double4 *posAux, double4 *velData, double4 *velAux, int bsize, int bnum) {
+
+  unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
+  // position and velocity (last frame)
+  double4 pos = posData[index];
+  double4 vel = velData[index];
+
+  double3 acc = {0,0,0};
+
+  for (int i = 0; i < bnum; i++) {
+
+    batchData[threadIdx.x] = posData[threadIdx.x + i * blockDim.x];
+    //__syncthreads();
+    __threadfence();
+
+    for (int i = 0; i < blockDim.x; i++) {
+      double4 r = batchData[i];
       r.x = r.x - pos.x;
       r.y = r.y - pos.y;
       r.z = r.z - pos.z;
@@ -75,36 +186,30 @@ __global__ void nbody_kernel(int n, double4 *posData, double4 *velData, int step
       acc.x = acc.x + r.x * s;
       acc.y = acc.y + r.y * s;
       acc.z = acc.z + r.z * s;
-
-      // No tengo idea de por que, pero este print a veces evita que la simulacion explote
-      printf("");
-
-
     }
-
-    vel.x = vel.x + acc.x;
-    vel.y = vel.y + acc.y;
-    vel.z = vel.z + acc.z;
-
-    pos.x = pos.x + vel.x;
-    pos.y = pos.y + vel.y;
-    pos.z = pos.z + vel.z;
-
-    __syncthreads();
-    __threadfence_system();
-
-    posData[index] = pos;
-    velData[index] = vel;
-
-    //printf("Particula %d: (%f,%f,%f)\n", index, vel.x, vel.y, vel.z);
-
+    //acc = batch_calculation(pos, acc, batchData, bsize);
+    __threadfence();
+    //__syncthreads();
   }
 
+  vel.x = vel.x + acc.x;
+  vel.y = vel.y + acc.y;
+  vel.z = vel.z + acc.z;
+
+  pos.x = pos.x + vel.x;
+  pos.y = pos.y + vel.y;
+  pos.z = pos.z + vel.z;
+
+  posAux[index] = pos;
+  velAux[index] = vel;
 };
 
-__global__ void nbody_kernel_single(int n, double4 *posData, double4 *posAux, double4 *velData, double4 *velAux) {
+__global__ void nbody_kernel_2D(int n, double4 *posData, double4 *posAux, double4 *velData, double4 *velAux, int nx) {
 
-  unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
+  unsigned int index_x = blockIdx.x * blockDim.x + threadIdx.x;
+  unsigned int index_y = blockIdx.y * blockDim.y + threadIdx.y;
+  unsigned int index = index_x + index_y*nx;
+
   // position and velocity (last frame)
   double4 pos = posData[index];
   double4 vel = velData[index];
@@ -127,9 +232,6 @@ __global__ void nbody_kernel_single(int n, double4 *posData, double4 *posAux, do
     acc.x = acc.x + r.x * s;
     acc.y = acc.y + r.y * s;
     acc.z = acc.z + r.z * s;
-
-    // No tengo idea de por que, pero este print a veces evita que la simulacion explote
-    //printf("");
   }
 
   vel.x = vel.x + acc.x;
@@ -140,138 +242,8 @@ __global__ void nbody_kernel_single(int n, double4 *posData, double4 *posAux, do
   pos.y = pos.y + vel.y;
   pos.z = pos.z + vel.z;
 
-  //__syncthreads();
-  // __threadfence_system();
-
   posAux[index] = pos;
   velAux[index] = vel;
-};
-
-__global__ void nbody_copy(double4 *posData, double4 *posAux, double4 *velData, double4 *velAux) {
-  unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
-  posData[index] = posAux[index];
-  velData[index] = velAux[index];
-};
-
-__device__ float3 batch_calculation(double4 pos, float3 acc, double4* data, int bsize) {
-  
-  double4 r;
-  for (int i = 0; i < bsize; i++) {
-    r = data[i];
-    r.x -= pos.x;
-    r.y -= pos.y;
-    r.z -= pos.z;
-
-    double distSqr = r.x * r.x + r.y * r.y + r.z * r.z + 0.1;
-    double dist = std::sqrt(distSqr);
-    double distCube = dist * dist * dist;
-    double s = r.w / distCube;
-
-    acc.x += r.x * s;
-    acc.y += r.y * s;
-    acc.z += r.z * s;
-
-    // No tengo idea de por que, pero este print evita que la simulacion explote
-      printf("");
-  }
-  return acc;
-}
-
-extern __shared__ double4 batchData[];
-__global__ void nbody_kernel_shared(int n, double4 *posData, double4 *velData, int steps, int bsize, int bnum) {
-
-  unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
-
-  while(steps--) {
-    // position and velocity (last frame)
-    double4 pos = posData[index];
-    double4 vel = velData[index];
-    float3 acc;
-
-    for (int i = 0; i < bnum; i++) {
-
-      batchData[threadIdx.x] = posData[threadIdx.x + i * blockDim.x];
-
-      __syncthreads();
-
-      acc = batch_calculation(pos, acc, batchData, bsize);
-
-      __syncthreads();
-    }
-
-    vel.x += acc.x;
-    vel.y += acc.y;
-    vel.z += acc.z;
-
-    pos.x += vel.x;
-    pos.y += vel.y;
-    pos.z += vel.z;
-
-    __syncthreads();
-    __threadfence_system();
-
-    posData[index] = pos;
-    velData[index] = vel;
-
-    __syncthreads();
-  }
-
-};
-
-__global__ void nbody_kernel_2D(int n, double4 *posData, double4 *velData, int steps, int nx) {
-
-  unsigned int index_x = blockIdx.x * blockDim.x + threadIdx.x;
-  unsigned int index_y = blockIdx.y * blockDim.y + threadIdx.y;
-
-  unsigned int index = index_x + index_y*nx;
-
-  //printf("Index_X: %d, Index_Y: %d, Index: %d\n", index_x, index_y, index);
-
-  while(steps--) {
-    // position and velocity (last frame)
-    double4 pos = posData[index];
-    double4 vel = velData[index];
-
-    double4 r;
-    double4 acc;
-
-    for (int i = 0; i < n; i++) {
-
-      r = posData[i];
-      r.x = r.x - pos.x;
-      r.y = r.y - pos.y;
-      r.z = r.z - pos.z;
-
-      double distSqr = r.x * r.x + r.y * r.y + r.z * r.z + 0.1;
-      double dist = std::sqrt(distSqr);
-      double distCube = dist * dist * dist;
-      double s = r.w / distCube;
-
-      acc.x = acc.x + r.x * s;
-      acc.y = acc.y + r.y * s;
-      acc.z = acc.z + r.z * s;
-
-      // No tengo idea de por que, pero este print evita que la simulacion explote
-      printf("");
-
-
-    }
-
-    vel.x = vel.x + acc.x;
-    vel.y = vel.y + acc.y;
-    vel.z = vel.z + acc.z;
-
-    pos.x = pos.x + vel.x;
-    pos.y = pos.y + vel.y;
-    pos.z = pos.z + vel.z;
-
-    __syncthreads();
-    __threadfence_system();
-
-    posData[index] = pos;
-    velData[index] = vel;
-  }
-
 };
 
 __global__ void nbody_kernel_shared_2D(int n, double4 *posData, double4 *velData, int steps, int bsize, int bnumx, int bnumy) {
@@ -286,7 +258,7 @@ __global__ void nbody_kernel_shared_2D(int n, double4 *posData, double4 *velData
     // position and velocity (last frame)
     double4 pos = posData[index];
     double4 vel = velData[index];
-    float3 acc;
+    double3 acc;
 
     for (int i = 0; i < bnumx; i++) {
       for (int j = 0; j < bnumy; j++) {

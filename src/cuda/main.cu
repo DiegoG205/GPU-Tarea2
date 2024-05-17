@@ -34,8 +34,7 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int threads2D, int
   } 
   else gen.seed(seed);//std::srand(seed);
 
-  std::size_t pos_size = sizeof(double4) * N;
-  std::size_t vel_size = sizeof(double4) * N;
+  std::size_t size = sizeof(double4) * N;
   std::vector<double4> posData(N);
   std::vector<double4> velData(N);
 
@@ -44,10 +43,10 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int threads2D, int
   double4 *velDev;
   double4 *auxPosDev;
   double4 *auxVelDev;
-  cudaMalloc(&posDev, pos_size);
-  cudaMalloc(&auxPosDev, pos_size);
-  cudaMalloc(&velDev, vel_size);
-  cudaMalloc(&auxVelDev, vel_size);
+  cudaMalloc(&posDev, size);
+  cudaMalloc(&auxPosDev, size);
+  cudaMalloc(&velDev, size);
+  cudaMalloc(&auxVelDev, size);
 
   // Assign values to host variables
   auto t_start = std::chrono::high_resolution_clock::now();
@@ -72,8 +71,8 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int threads2D, int
 
   // Copy values from host variables to device
   t_start = std::chrono::high_resolution_clock::now();
-  cudaMemcpy(posDev, posData.data(), pos_size, cudaMemcpyHostToDevice);
-  cudaMemcpy(velDev, velData.data(), pos_size, cudaMemcpyHostToDevice);
+  cudaMemcpy(posDev, posData.data(), size, cudaMemcpyHostToDevice);
+  cudaMemcpy(velDev, velData.data(), size, cudaMemcpyHostToDevice);
   t_end = std::chrono::high_resolution_clock::now();
   t.copy_to_device =
       std::chrono::duration_cast<microseconds>(t_end - t_start).count();
@@ -92,7 +91,13 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int threads2D, int
       //nbody_kernel_shared_2D<<<blocks, threads, (sizeof(int4)*64)>>>(N, posDev, velDev, Steps, 8, blocks.x, blocks.y);
     }
     else {
-      nbody_kernel_2D<<<blocks, threads>>>(N, posDev, velDev, Steps, blocks.x * threads.x);
+      while(Steps--){
+        nbody_kernel_2D<<<blocks, threads>>>(N, posDev, auxPosDev, velDev, auxVelDev, blocks.x * threads.x);
+        cudaDeviceSynchronize();
+        cudaMemcpy(posDev, auxPosDev, size, cudaMemcpyDeviceToHost);
+        cudaMemcpy(velDev, auxVelDev, size, cudaMemcpyDeviceToHost);
+        cudaDeviceSynchronize();
+      }
     }
   }
   else {
@@ -103,8 +108,13 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int threads2D, int
       // Shared memory
       std::cout << "Using shared memory: \n";
       t_start = std::chrono::high_resolution_clock::now();
-      nbody_kernel_shared<<<blockSize, gridSize, (sizeof(int4)*blockSize)>>>(N, posDev, velDev, Steps, blockSize, gridSize);
-      cudaDeviceSynchronize();
+      while(Steps--){
+        nbody_kernel_shared<<<blockSize, gridSize, (sizeof(double4)*blockSize)>>>(N, posDev, auxPosDev, velDev, auxVelDev, blockSize, gridSize);
+        cudaDeviceSynchronize();
+        cudaMemcpy(posDev, auxPosDev, size, cudaMemcpyDeviceToHost);
+        cudaMemcpy(velDev, auxVelDev, size, cudaMemcpyDeviceToHost);
+        cudaDeviceSynchronize();
+      }
     } 
     else {
       // No shared memory
@@ -112,14 +122,12 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int threads2D, int
       t_start = std::chrono::high_resolution_clock::now();
 
       while(Steps--){
-        nbody_kernel_single<<<blockSize, gridSize>>>(N, posDev, auxPosDev, velDev, auxVelDev);
+        nbody_kernel<<<blockSize, gridSize>>>(N, posDev, auxPosDev, velDev, auxVelDev);
         cudaDeviceSynchronize();
-        nbody_copy<<<blockSize, gridSize>>>(posDev, auxPosDev, velDev, auxVelDev);
+        cudaMemcpy(posDev, auxPosDev, size, cudaMemcpyDeviceToHost);
+        cudaMemcpy(velDev, auxVelDev, size, cudaMemcpyDeviceToHost);
         cudaDeviceSynchronize();
       }
-      
-      // nbody_kernel<<<blockSize, gridSize>>>(N, posDev, velDev, Steps);
-      // cudaDeviceSynchronize();
     }
   }
   
@@ -129,7 +137,7 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int threads2D, int
 
   // Copy the output variable from device to host
   t_start = std::chrono::high_resolution_clock::now();
-  cudaMemcpy(posData.data(), posDev, pos_size, cudaMemcpyDeviceToHost);
+  cudaMemcpy(posData.data(), posDev, size, cudaMemcpyDeviceToHost);
   t_end = std::chrono::high_resolution_clock::now();
   t.copy_to_host =
       std::chrono::duration_cast<std::chrono::microseconds>(t_end - t_start).count();
