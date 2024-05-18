@@ -3,6 +3,7 @@
 #include <iostream>
 #include <vector>
 #include <ctime>
+#include <random>
 
 #include "kernel.h"
 
@@ -17,18 +18,23 @@ Times t;
 
 bool simulate(int N, int Steps, int seed) {
   using std::chrono::microseconds;
+
+  std::default_random_engine gen;
+
   if (!seed) {
     std::cout << "Random seed\n";
-    std::srand(std::time(0));
+    gen.seed(std::time(0));
+    //std::srand(std::time(0));
   } 
-  else std::srand(seed);
+  else gen.seed(seed);//std::srand(seed);
 
   std::vector<pData> data(N);
-  std::vector<pData> aux(N);
 
   auto t_start = std::chrono::high_resolution_clock::now();
+  std::uniform_real_distribution<double> pos(0.0, 10000.0);
+  std::uniform_real_distribution<double> mass(50000.0, 100000.0);
   for (int i = 0; i < N; i++) {
-    data[i] = {(std::rand() % 10000), (std::rand() % 10000), (std::rand() % 10000), (std::rand() % 50000 + 50000), 0, 0, 0};
+    data[i] = {pos(gen), pos(gen), pos(gen), mass(gen), 0, 0, 0};
   }
   auto t_end = std::chrono::high_resolution_clock::now();
   t.create_data =

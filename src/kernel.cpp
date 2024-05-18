@@ -19,7 +19,7 @@ void nbody_sec(int n, std::vector<pData> &data, int steps) {
 
         if (j == i) continue;
 
-        int rx,ry,rz;
+        double rx,ry,rz;
 
         rx = data[j].x - data[i].x;
         ry = data[j].y - data[i].y;
@@ -43,7 +43,7 @@ void nbody_sec(int n, std::vector<pData> &data, int steps) {
 
       //std::cout << "Particula " << i << ": (" << vx << ", " << vy << ", " << vz << ")\n";
 
-      temp[i] = {data[i].x + lround(vx), data[i].y + lround(vy), data[i].z + lround(vz), data[i].m, vx, vy, vz};
+      temp[i] = {data[i].x + vx, data[i].y + vy, data[i].z + vz, data[i].m, vx, vy, vz};
     }
 
     for (int i = 0; i < n; i++) {

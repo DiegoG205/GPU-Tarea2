@@ -1,7 +1,7 @@
 #include <vector>
 
 typedef struct {
-    int x, y, z, m;
+    double x, y, z, m;
     double vx, vy, vz;
 } pData;
 
