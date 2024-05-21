@@ -326,35 +326,35 @@ bool simulate_default(int N, int localSize, int globalSize) {
 }
 
 int main(int argc, char* argv[]) {
-  if (!init()) return 1;
-
-  if (argc != 5) {
-    std::cerr << "Uso: " << argv[0]
-              << " <array size> <local size> <global size> <output file>"
+  if (argc != 7 && argc != 8) {
+    std::cerr << "Uso: " << argv[0] << " <particle_count> <step_count> <block size> <shared_mem> <2d_threads> <output_file> <seed (optional)>"
               << std::endl;
     return 2;
   }
-  int n = std::stoi(argv[1]);
-  int ls = std::stoi(argv[2]);
-  int gs = std::stoi(argv[3]);
+  int n = std::atoi(argv[1]);
+  int s = std::atoi(argv[2]);
+  int bs = std::atoi(argv[3]);
+  int shm = std::atoi(argv[4]);
+  int th2d = std::atoi(argv[5]);
+  int seed = 0;
+  if (argc == 8) seed = std::atoi(argv[7]);
 
-  if (!simulate(n, ls, gs)) {
-    std::cerr << "CL: Error while executing the simulation" << std::endl;
+  if (!simulate(n, s, bs, shm, th2d, seed)) {
+    std::cerr << "OpenCL: Error while executing the simulation" << std::endl;
     return 3;
   }
 
   std::ofstream out;
-  out.open(argv[4], std::ios::app | std::ios::out);
+  out.open(argv[6], std::ios::app | std::ios::out);
   if (!out.is_open()) {
-    std::cerr << "Error while opening file: '" << argv[2] << "'" << std::endl;
+    std::cerr << "Error while opening file: '" << argv[6] << "'" << std::endl;
     return 4;
   }
   // params
-  out << n << "," << ls << "," << gs << ",";
+  // out << n << "," << bs << "," << gs << ",";
   // times
-  out << t.create_data << "," << t.copy_to_device << "," << t.execution << ","
-      << t.copy_to_host << "," << t.total() << "\n";
+  out << n << "," << s << "," << bs << "," << t.total() << "\n";
 
-  std::cout << "Data written to " << argv[4] << std::endl;
+  std::cout << "Data written to " << argv[6] << std::endl;
   return 0;
 }
