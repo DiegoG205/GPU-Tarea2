@@ -117,17 +117,24 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int threads2D, int
 
   // Make kernel
   if (threads2D) {
-    const cl_uint3 threads(8, 8, 1);
+    const cl_uint3 threads = {8, 8, 1};
     int blocknum = (N + 63)/64;
-	  const cl_uint3 blocks((blocknum+1)/2, 2, 1);
+	  const cl_uint3 blocks={(blocknum+1)/2, 2, 1};
     if (sharedMem) {
       std::cerr << "Can't activate both options at the same time\n";
-      //nbody_kernel_shared_2D<<<blocks, threads, (sizeof(int4)*64)>>>(N, posDev, velDev, Steps, 8, blocks.x, blocks.y);
+      //nbody_kernel_shared_2D
+        // <<<blocks,
+        // threads,
+        // (sizeof(int4)*64)>>>
+          // (N, posDev, velDev, Steps, 8, blocks.x, blocks.y);
     }
     else {
       while(Steps--){
         // Make kernel
-        //nbody_kernel_2D<<<blocks, threads>>>(N, posDev, auxPosDev, velDev, auxVelDev, blocks.x * threads.x);
+        //nbody_kernel_2D
+          // <<<blocks Tamaño de un bloque,
+          // threads Cantidad de bloques>>>
+            // (N, posDev, auxPosDev, velDev, auxVelDev, blocks.x * threads.x);
         cl::Kernel kernel(prog, "nbody_kernel_2D");
 
         // Set the kernel arguments
@@ -140,15 +147,14 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int threads2D, int
         kernel.setArg(5, blocks.x * threads.x);
 
         // Execute the function on the device (using 32 threads here)
-        cl::NDRange gSize(globalSize);//Cantidad Total WorkItems
-        cl::NDRange lSize(localSize);//WorkItems por WorkGroup
+        cl::NDRange gSize(threads.x*blocks.x, threads.y*blocks.y);//Cantidad Total WorkItems
+        cl::NDRange lSize(blocks.x, blocks.y);//WorkItems por WorkGroup
 
         queue.enqueueNDRangeKernel(kernel, cl::NullRange, gSize, lSize);
         queue.finish();
-        //cudaDeviceSynchronize!!!
         queue.enqueueReadBuffer(auxPosDev, CL_TRUE, 0, size, &posDev);
         queue.enqueueReadBuffer(auxVelDev, CL_TRUE, 0, size, &velDev);
-        //cudaDeviceSynchronize!!!
+        queue.finish();
       }
     }
   }
@@ -162,7 +168,11 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int threads2D, int
       t_start = std::chrono::high_resolution_clock::now();
       while(Steps--){
         // Make kernel
-        // nbody_kernel_shared<<<blockSize, gridSize, (sizeof(double4)*blockSize)>>>(N, posDev, auxPosDev, velDev, auxVelDev, blockSize, gridSize);
+        // nbody_kernel_shared
+          // <<<blockSize Tamaño de un bloque,
+          // gridSize Cantidad de bloques,
+          // (sizeof(double4)*blockSize) Tamaño de memoria compartida>>>
+            // (N, posDev, auxPosDev, velDev, auxVelDev, blockSize, gridSize);
         cl::Kernel kernel(prog, "nbody_kernel_shared");
 
         // Set the kernel arguments
@@ -175,15 +185,15 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int threads2D, int
         kernel.setArg(6, gridSize);
 
         // Execute the function on the device (using 32 threads here)
-        cl::NDRange gSize(globalSize);//Cantidad Total WorkItems
-        cl::NDRange lSize(localSize);//WorkItems por WorkGroup
+        cl::NDRange gSize(gridSize*blockSize);//Cantidad Total WorkItems
+        cl::NDRange lSize(blockSize);//WorkItems por WorkGroup
+        //memoria compartida (sizeof(cl_double4)*blockSize)
 
         queue.enqueueNDRangeKernel(kernel, cl::NullRange, gSize, lSize);
         queue.finish();
-        //cudaDeviceSynchronize!!!
         queue.enqueueReadBuffer(auxPosDev, CL_TRUE, 0, size, &posDev);
         queue.enqueueReadBuffer(auxVelDev, CL_TRUE, 0, size, &velDev);
-        //cudaDeviceSynchronize!!!
+        queue.finish();
       }
     }
     else {
@@ -192,7 +202,10 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int threads2D, int
       t_start = std::chrono::high_resolution_clock::now();
       while(Steps--){
         // Make kernel
-        // nbody_kernel<<<blockSize, gridSize>>>(N, posDev, auxPosDev, velDev, auxVelDev);
+        // nbody_kernel
+          // <<<blockSize Tamaño de un bloque,
+          // gridSize cantidad de bloques>>>
+            // (N, posDev, auxPosDev, velDev, auxVelDev);
         cl::Kernel kernel(prog, "nbody_kernel");
 
         // Set the kernel arguments
@@ -205,15 +218,14 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int threads2D, int
         kernel.setArg(6, gridSize);
 
         // Execute the function on the device (using 32 threads here)
-        cl::NDRange gSize(globalSize);//Cantidad Total WorkItems
-        cl::NDRange lSize(localSize);//WorkItems por WorkGroup
+        cl::NDRange gSize(gridSize*blockSize);//Cantidad Total WorkItems
+        cl::NDRange lSize(blockSize);//WorkItems por WorkGroup
 
         queue.enqueueNDRangeKernel(kernel, cl::NullRange, gSize, lSize);
         queue.finish();
-        //cudaDeviceSynchronize!!!
         queue.enqueueReadBuffer(auxPosDev, CL_TRUE, 0, size, &posDev);
         queue.enqueueReadBuffer(auxVelDev, CL_TRUE, 0, size, &velDev);
-        //cudaDeviceSynchronize!!!
+        queue.finish();
       }
     }
   }
