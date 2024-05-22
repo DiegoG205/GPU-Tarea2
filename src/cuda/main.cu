@@ -86,9 +86,17 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int threads2D, int
     const dim3 threads(8, 8, 1);
     int blocknum = (N + 63)/64;
 	  const dim3 blocks((blocknum+1)/2, 2, 1);
+    std::cout << blocks.x << " " << blocks.y << '\n';
     if (sharedMem) {
-      std::cerr << "Can't activate both options at the same time\n";
-      //nbody_kernel_shared_2D<<<blocks, threads, (sizeof(int4)*64)>>>(N, posDev, velDev, Steps, 8, blocks.x, blocks.y);
+      while(Steps--){
+        nbody_kernel_shared_2D<<<blocks, threads, (sizeof(double4)*64)>>>(N, posDev, auxPosDev, velDev, auxPosDev, 8, blocks.x, blocks.y);
+        cudaDeviceSynchronize();
+        cudaMemcpy(posDev, auxPosDev, size, cudaMemcpyDeviceToHost);
+        cudaMemcpy(velDev, auxVelDev, size, cudaMemcpyDeviceToHost);
+        cudaDeviceSynchronize();
+      }
+      //std::cerr << "Can't activate both options at the same time\n";
+      //nbody_kernel_shared_2D<<<blocks, threads, (sizeof(double4)*64)>>>(N, posDev, velDev, Steps, 8, blocks.x, blocks.y);
     }
     else {
       while(Steps--){
