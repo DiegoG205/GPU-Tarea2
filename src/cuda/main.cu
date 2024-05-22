@@ -78,33 +78,20 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int threads2D, int
       std::chrono::duration_cast<microseconds>(t_end - t_start).count();
 
   t_start = std::chrono::high_resolution_clock::now();
-      
-  // test<<<1, 1>>>(N, posDev, auxPosDev, velDev, auxVelDev, Steps);
-  // cudaDeviceSynchronize();
 
   if (threads2D) {
-    const dim3 threads(8, 8, 1);
-    int blocknum = (N + 63)/64;
-	  const dim3 blocks((blocknum+1)/2, 2, 1);
-    std::cout << blocks.x << " " << blocks.y << '\n';
     if (sharedMem) {
-      while(Steps--){
-        nbody_kernel_shared_2D<<<blocks, threads, (sizeof(double4)*64)>>>(N, posDev, auxPosDev, velDev, auxPosDev, 8, blocks.x, blocks.y);
-        cudaDeviceSynchronize();
-        cudaMemcpy(posDev, auxPosDev, size, cudaMemcpyDeviceToHost);
-        cudaMemcpy(velDev, auxVelDev, size, cudaMemcpyDeviceToHost);
-        cudaDeviceSynchronize();
-      }
-      //std::cerr << "Can't activate both options at the same time\n";
-      //nbody_kernel_shared_2D<<<blocks, threads, (sizeof(double4)*64)>>>(N, posDev, velDev, Steps, 8, blocks.x, blocks.y);
+      std::cerr << "Can't activate both options at the same time\n";
     }
     else {
+      const dim3 threads(8, 8, 1);
+      int blocknum = (N + 63)/64;
+      const dim3 blocks((blocknum+1)/2, 2, 1);
+      std::cout << blocks.x << " " << blocks.y << '\n';
       while(Steps--){
-        nbody_kernel_2D<<<blocks, threads>>>(N, posDev, auxPosDev, velDev, auxVelDev, blocks.x * threads.x);
-        cudaDeviceSynchronize();
-        cudaMemcpy(posDev, auxPosDev, size, cudaMemcpyDeviceToHost);
-        cudaMemcpy(velDev, auxVelDev, size, cudaMemcpyDeviceToHost);
-        cudaDeviceSynchronize();
+        nbody_kernel_2D<<<blocks, threads>>>(N, posDev, auxPosDev, velDev, auxVelDev);
+        cudaMemcpy(posDev, auxPosDev, size, cudaMemcpyDeviceToDevice);
+        cudaMemcpy(velDev, auxVelDev, size, cudaMemcpyDeviceToDevice);
       }
     }
   }
@@ -118,10 +105,8 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int threads2D, int
       t_start = std::chrono::high_resolution_clock::now();
       while(Steps--){
         nbody_kernel_shared<<<blockSize, gridSize, (sizeof(double4)*blockSize)>>>(N, posDev, auxPosDev, velDev, auxVelDev, blockSize, gridSize);
-        cudaDeviceSynchronize();
-        cudaMemcpy(posDev, auxPosDev, size, cudaMemcpyDeviceToHost);
-        cudaMemcpy(velDev, auxVelDev, size, cudaMemcpyDeviceToHost);
-        cudaDeviceSynchronize();
+        cudaMemcpy(posDev, auxPosDev, size, cudaMemcpyDeviceToDevice);
+        cudaMemcpy(velDev, auxVelDev, size, cudaMemcpyDeviceToDevice);
       }
     } 
     else {
@@ -131,10 +116,8 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int threads2D, int
 
       while(Steps--){
         nbody_kernel<<<blockSize, gridSize>>>(N, posDev, auxPosDev, velDev, auxVelDev);
-        cudaDeviceSynchronize();
-        cudaMemcpy(posDev, auxPosDev, size, cudaMemcpyDeviceToHost);
-        cudaMemcpy(velDev, auxVelDev, size, cudaMemcpyDeviceToHost);
-        cudaDeviceSynchronize();
+        cudaMemcpy(posDev, auxPosDev, size, cudaMemcpyDeviceToDevice);
+        cudaMemcpy(velDev, auxVelDev, size, cudaMemcpyDeviceToDevice);
       }
     }
   }
