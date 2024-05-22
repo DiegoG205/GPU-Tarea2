@@ -27,7 +27,7 @@ kernel cl_double3 batch_calculation(cl_double4 pos, cl_double3 acc, cl_double4* 
   return acc;
 }
 
-extern __shared__ double4 batchData[];
+extern __shared__ cl_double4 batchData[];
 
 kernel void nbody_kernel(int n, cl_double4 *posData, cl_double4 *posAux, cl_double4 *velData, cl_double4 *velAux) {
   unsigned int index = get_global_id(0);
@@ -94,6 +94,49 @@ kernel void nbody_kernel_2D(int n, cl_double4 *posData, cl_double4 *posAux, cl_d
     acc.x = acc.x + r.x * s;
     acc.y = acc.y + r.y * s;
     acc.z = acc.z + r.z *s;
+  }
+
+  vel.x = vel.x + acc.x;
+  vel.y = vel.y + acc.y;
+  vel.z = vel.z + acc.z;
+
+  pos.x = pos.x + vel.x;
+  pos.y = pos.y + vel.y;
+  pos.z = pos.z + vel.z;
+
+  posAux[index] = pos;
+  velAux[index] = vel;
+};
+
+__global__ void nbody_kernel_shared(int n, cl_double4 *posData, cl_double4 *posAux, cl_double4 *velData, cl_double4 *velAux, int bsize, int bnum) {
+
+  unsigned int index = get_global_id(0);
+  cl_double4 pos = posData[index];
+  cl_double4 vel = velData[index];
+
+  cl_double3 acc = {0,0,0};
+
+  for (int i = 0; i < bnum; i++) {
+
+    batchData[threadIdx.x] = posData[threadIdx.x + i * blockDim.x];
+    barrier();
+
+    for (int i = 0; i < blockDim.x; i++) {
+      cl_double4 r = batchData[i];
+      r.x = r.x - pos.x;
+      r.y = r.y - pos.y;
+      r.z = r.z - pos.z;
+
+      double distSqr = r.x * r.x + r.y * r.y + r.z * r.z + 0.1;
+      double dist = std::sqrt(distSqr);
+      double distCube = dist * dist * dist;
+      double s = r.w / distCube;
+
+      acc.x = acc.x + r.x * s;
+      acc.y = acc.y + r.y * s;
+      acc.z = acc.z + r.z * s;
+    }
+    barrier();
   }
 
   vel.x = vel.x + acc.x;
