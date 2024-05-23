@@ -118,15 +118,10 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int threads2D, int
   // Make kernel
   if (threads2D) {
     const cl_uint3 threads = {8, 8, 1};
-    int blocknum = (N + 63)/64;
+    cl_uint blocknum = (N + 63)/64;
 	  const cl_uint3 blocks={(blocknum+1)/2, 2, 1};
     if (sharedMem) {
       std::cerr << "Can't activate both options at the same time\n";
-      //nbody_kernel_shared_2D
-        // <<<blocks,
-        // threads,
-        // (sizeof(int4)*64)>>>
-          // (N, posDev, velDev, Steps, 8, blocks.x, blocks.y);
     }
     else {
       while(Steps--){
@@ -151,10 +146,8 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int threads2D, int
         cl::NDRange lSize(blocks.x, blocks.y);//WorkItems por WorkGroup
 
         queue.enqueueNDRangeKernel(kernel, cl::NullRange, gSize, lSize);
-        queue.finish();
-        queue.enqueueReadBuffer(auxPosDev, CL_TRUE, 0, size, &posDev);
-        queue.enqueueReadBuffer(auxVelDev, CL_TRUE, 0, size, &velDev);
-        queue.finish();
+        queue.enqueueCopyBuffer(auxPosDev, posDev, 0, 0, size);
+        queue.enqueueCopyBuffer(auxVelDev, velDev, 0, 0, size);
       }
     }
   }
@@ -187,13 +180,11 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int threads2D, int
         // Execute the function on the device (using 32 threads here)
         cl::NDRange gSize(gridSize*blockSize);//Cantidad Total WorkItems
         cl::NDRange lSize(blockSize);//WorkItems por WorkGroup
-        //memoria compartida (sizeof(cl_double4)*blockSize)
+        //memoria compartida (sizeof(cl_float4)*blockSize)
 
         queue.enqueueNDRangeKernel(kernel, cl::NullRange, gSize, lSize);
-        queue.finish();
-        queue.enqueueReadBuffer(auxPosDev, CL_TRUE, 0, size, &posDev);
-        queue.enqueueReadBuffer(auxVelDev, CL_TRUE, 0, size, &velDev);
-        queue.finish();
+        queue.enqueueCopyBuffer(auxPosDev, posDev, 0, 0, size);
+        queue.enqueueCopyBuffer(auxVelDev, velDev, 0, 0, size);
       }
     }
     else {
@@ -214,23 +205,20 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int threads2D, int
         kernel.setArg(2, auxPosDev);
         kernel.setArg(3, velDev);
         kernel.setArg(4, auxVelDev);
-        kernel.setArg(5, blockSize);
-        kernel.setArg(6, gridSize);
+        // kernel.setArg(5, blockSize);
+        // kernel.setArg(6, gridSize);
 
         // Execute the function on the device (using 32 threads here)
         cl::NDRange gSize(gridSize*blockSize);//Cantidad Total WorkItems
         cl::NDRange lSize(blockSize);//WorkItems por WorkGroup
 
         queue.enqueueNDRangeKernel(kernel, cl::NullRange, gSize, lSize);
-        queue.finish();
-        queue.enqueueReadBuffer(auxPosDev, CL_TRUE, 0, size, &posDev);
-        queue.enqueueReadBuffer(auxVelDev, CL_TRUE, 0, size, &velDev);
-        queue.finish();
+        queue.enqueueCopyBuffer(auxPosDev, posDev, 0, 0, size);
+        queue.enqueueCopyBuffer(auxVelDev, velDev, 0, 0, size);
       }
     }
   }
-  
-  queue.finish();
+
   t_end = std::chrono::high_resolution_clock::now();
   t.execution =
       std::chrono::duration_cast<std::chrono::microseconds>(t_end - t_start)
