@@ -45,11 +45,23 @@ bool init() {
   cl::Context context(devices.front());
   queue = cl::CommandQueue(context, devices.front());
 
-  std::ifstream sourceFile("kernel.cl");
+  std::ifstream sourceFile("src/cl/kernel.cl");
   std::stringstream sourceCode;
   sourceCode << sourceFile.rdbuf();
 
-  prog = cl::Program(context, sourceCode.str(), true);
+  cl_int err;
+
+  prog = cl::Program(context, sourceCode.str(), true, &err);
+
+  if(err != CL_SUCCESS) {
+    std::cerr << err <<"\n";
+    // Get the build log
+    std::string name     = devices.front().getInfo<CL_DEVICE_NAME>();
+    std::string buildlog = prog.getBuildInfo<CL_PROGRAM_BUILD_LOG>(devices.front());
+    std::cerr << "Build log for " << name << ":" << std::endl
+                << buildlog << std::endl;
+    };
+  
 
   return true;
 }
