@@ -27,10 +27,14 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int threads2D, int
 
   std::default_random_engine gen;
 
+  if (sharedMem && threads2D) {
+      std::cerr << "Can't activate both options at the same time\n";
+      return false;
+  }
+
   if (!seed) {
     std::cout << "Random seed\n";
     gen.seed(std::time(0));
-    //std::srand(std::time(0));
   } 
   else gen.seed(seed);//std::srand(seed);
 
@@ -82,12 +86,12 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int threads2D, int
   if (threads2D) {
     if (sharedMem) {
       std::cerr << "Can't activate both options at the same time\n";
+      return false;
     }
     else {
       const dim3 threads(8, 8, 1);
       int blocknum = (N + 63)/64;
       const dim3 blocks((blocknum+1)/2, 2, 1);
-      std::cout << blocks.x << " " << blocks.y << '\n';
       while(Steps--){
         nbody_kernel_2D<<<blocks, threads>>>(N, posDev, auxPosDev, velDev, auxVelDev);
         cudaMemcpy(posDev, auxPosDev, size, cudaMemcpyDeviceToDevice);
@@ -181,9 +185,7 @@ int main(int argc, char* argv[]) {
     std::cerr << "Error while opening file: '" << argv[6] << "'" << std::endl;
     return 4;
   }
-  // params
-  // out << n << "," << bs << "," << gs << ",";
-  // times
+
   out << n << "," << s << "," << bs << "," << t.total() << "\n";
 
   std::cout << "Data written to " << argv[6] << std::endl;

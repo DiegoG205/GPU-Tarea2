@@ -24,9 +24,8 @@ bool simulate(int N, int Steps, int seed) {
   if (!seed) {
     std::cout << "Random seed\n";
     gen.seed(std::time(0));
-    //std::srand(std::time(0));
   } 
-  else gen.seed(seed);//std::srand(seed);
+  else gen.seed(seed);
 
   std::vector<pData> data(N);
 

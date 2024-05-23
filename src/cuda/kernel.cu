@@ -42,27 +42,6 @@ __global__ void nbody_kernel(int n, double4 *posData, double4 *posAux, double4 *
   velAux[index] = vel;
 };
 
-__device__ double3 batch_calculation(double4 pos, double3 acc, double4* data, int bsize) {
-  
-  double4 r;
-  for (int i = 0; i < blockDim.x; i++) {
-    r = data[i];
-    r.x = r.x - pos.x;
-    r.y = r.y - pos.y;
-    r.z = r.z - pos.z;
-
-    double distSqr = r.x * r.x + r.y * r.y + r.z * r.z + 0.1;
-    double dist = std::sqrt(distSqr);
-    double distCube = dist * dist * dist;
-    double s = r.w / distCube;
-
-    acc.x = acc.x + r.x * s;
-    acc.y = acc.y + r.y * s;
-    acc.z = acc.z + r.z * s;
-  }
-  return acc;
-}
-
 extern __shared__ double4 batchData[];
 
 __global__ void nbody_kernel_shared(int n, double4 *posData, double4 *posAux, double4 *velData, double4 *velAux, int bsize, int bnum) {
@@ -150,6 +129,4 @@ __global__ void nbody_kernel_2D(int n, double4 *posData, double4 *posAux, double
 
   posAux[index] = pos;
   velAux[index] = vel;
-
-  //printf("%d %f %f %f\n", index, pos.x, pos.y, pos.z);
 };

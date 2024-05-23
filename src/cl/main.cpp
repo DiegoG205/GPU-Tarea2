@@ -79,10 +79,14 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int threads2D, int
   
   std::default_random_engine gen;
 
+  if (sharedMem && threads2D) {
+      std::cerr << "Can't activate both options at the same time\n";
+      return false;
+  }
+
   if (!seed){ 
     std::cout << "Random seed\n";
     gen.seed(std::time(0));
-    //std::srand(std::time(0));
   }
   else gen.seed(seed);
 
@@ -134,6 +138,7 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int threads2D, int
 	  const cl_uint3 blocks={(blocknum+1)/2, 2, 1};
     if (sharedMem) {
       std::cerr << "Can't activate both options at the same time\n";
+      return false;
     }
     else {
       while(Steps--){
@@ -261,82 +266,6 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int threads2D, int
   return true;
 }
 
-bool simulate_default(int N, int localSize, int globalSize) {
-  using std::chrono::microseconds;
-  std::size_t size = sizeof(int) * N;
-  std::vector<int> a(N), b(N), c(N);
-
-  // Create the memory buffers
-  cl::Buffer aBuff(queue.getInfo<CL_QUEUE_CONTEXT>(), CL_MEM_READ_WRITE, size);
-  cl::Buffer bBuff(queue.getInfo<CL_QUEUE_CONTEXT>(), CL_MEM_READ_WRITE, size);
-  cl::Buffer cBuff(queue.getInfo<CL_QUEUE_CONTEXT>(), CL_MEM_READ_WRITE, size);
-
-  // Assign values to host variables
-  auto t_start = std::chrono::high_resolution_clock::now();
-  for (int i = 0; i < N; i++) {
-    a[i] = std::rand() % 2000;
-    b[i] = std::rand() % 2000;
-    c[i] = 0;
-  }
-  auto t_end = std::chrono::high_resolution_clock::now();
-  t.create_data =
-      std::chrono::duration_cast<microseconds>(t_end - t_start).count();
-
-  // Copy values from host variables to device
-  t_start = std::chrono::high_resolution_clock::now();
-  // usar CL_FALSE para hacerlo asíncrono
-  queue.enqueueWriteBuffer(aBuff, CL_TRUE, 0, size, a.data());
-  queue.enqueueWriteBuffer(bBuff, CL_TRUE, 0, size, b.data());
-  t_end = std::chrono::high_resolution_clock::now();
-  t.copy_to_device =
-      std::chrono::duration_cast<microseconds>(t_end - t_start).count();
-
-  // Make kernel
-  cl::Kernel kernel(prog, "vec_sum");
-
-  // Set the kernel arguments
-  kernel.setArg(0, aBuff);
-  kernel.setArg(1, bBuff);
-  kernel.setArg(2, cBuff);
-  kernel.setArg(3, N);
-
-  // Execute the function on the device (using 32 threads here)
-  cl::NDRange gSize(globalSize);
-  cl::NDRange lSize(localSize);
-
-  t_start = std::chrono::high_resolution_clock::now();
-  queue.enqueueNDRangeKernel(kernel, cl::NullRange, globalSize, localSize);
-  queue.finish();
-  t_end = std::chrono::high_resolution_clock::now();
-  t.execution =
-      std::chrono::duration_cast<std::chrono::microseconds>(t_end - t_start)
-          .count();
-
-  // Copy the output variable from device to host
-  t_start = std::chrono::high_resolution_clock::now();
-  queue.enqueueReadBuffer(cBuff, CL_TRUE, 0, size, c.data());
-  t_end = std::chrono::high_resolution_clock::now();
-  t.copy_to_host =
-      std::chrono::duration_cast<std::chrono::microseconds>(t_end - t_start)
-          .count();
-
-  // Print the result
-  std::cout << "RESULTS: " << std::endl;
-  for (int i = 0; i < N; i++)
-    std::cout << "  out[" << i << "]: " << c[i] << " (" << a[i] << " + " << b[i]
-              << ")\n";
-
-  std::cout << "Time to create data: " << t.create_data << " microseconds\n";
-  std::cout << "Time to copy data to device: " << t.copy_to_device
-            << " microseconds\n";
-  std::cout << "Time to execute kernel: " << t.execution << " microseconds\n";
-  std::cout << "Time to copy data to host: " << t.copy_to_host
-            << " microseconds\n";
-  std::cout << "Time to execute the whole program: " << t.total()
-            << " microseconds\n";
-  return true;
-}
-
 int main(int argc, char* argv[]) {
   
   if (!init()) return 1;
@@ -365,9 +294,7 @@ int main(int argc, char* argv[]) {
     std::cerr << "Error while opening file: '" << argv[6] << "'" << std::endl;
     return 4;
   }
-  // params
-  // out << n << "," << bs << "," << gs << ",";
-  // times
+
   out << n << "," << s << "," << bs << "," << t.total() << "\n";
 
   std::cout << "Data written to " << argv[6] << std::endl;
