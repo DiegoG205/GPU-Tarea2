@@ -43,6 +43,7 @@ t = 64
 
 print("Test 2: Cuda Comparison")
 n = 512
+t = 128
 
 fcu = open("out2Cuda.txt", "wt")
 fcu.write("n,steps,threads,time\n")
@@ -67,8 +68,8 @@ for i in range(0, 3): # Desde 1024 a 4096
         print('Cuda')
         p = subprocess.Popen(['.\\build\\src\\cuda\\Debug\\MyProjectCUDA.exe', str(n), str(s), str(t), '0', '0', "out2Cuda.txt", str(seed)],stdout=subprocess.DEVNULL,stderr=subprocess.STDOUT)
         p.wait()
-        print('Cuda 45')
-        p = subprocess.Popen(['.\\build\\src\\cuda\\Debug\\MyProjectCUDA.exe', str(n), str(s), str(45), '0', '0', "out2CudaIrregular.txt", str(seed)],stdout=subprocess.DEVNULL,stderr=subprocess.STDOUT)
+        print('Cuda 100')
+        p = subprocess.Popen(['.\\build\\src\\cuda\\Debug\\MyProjectCUDA.exe', str(n), str(s), str(100), '0', '0', "out2CudaIrregular.txt", str(seed)],stdout=subprocess.DEVNULL,stderr=subprocess.STDOUT)
         p.wait()
         print('Cuda Shared')
         p = subprocess.Popen(['.\\build\\src\\cuda\\Debug\\MyProjectCUDA.exe', str(n), str(s), str(t), '1', '0', "out2CudaShared.txt", str(seed)],stdout=subprocess.DEVNULL,stderr=subprocess.STDOUT)
@@ -102,8 +103,8 @@ for i in range(0, 3): # Desde 1024 a 4096
         print('OpenCL')
         p = subprocess.Popen(['.\\build\\src\\cl\\Debug\\MyProjectCL.exe', str(n), str(s), str(t), '0', '0', "out3CL.txt", str(seed)],stdout=subprocess.DEVNULL,stderr=subprocess.STDOUT)
         p.wait()
-        print('OpenCL 45')
-        p = subprocess.Popen(['.\\build\\src\\cl\\Debug\\MyProjectCL.exe', str(n), str(s), str(45), '0', '0', "out3CLIrregular.txt", str(seed)],stdout=subprocess.DEVNULL,stderr=subprocess.STDOUT)
+        print('OpenCL 100')
+        p = subprocess.Popen(['.\\build\\src\\cl\\Debug\\MyProjectCL.exe', str(n), str(s), str(100), '0', '0', "out3CLIrregular.txt", str(seed)],stdout=subprocess.DEVNULL,stderr=subprocess.STDOUT)
         p.wait()
         print('OpenCL Shared')
         p = subprocess.Popen(['.\\build\\src\\cl\\Debug\\MyProjectCL.exe', str(n), str(s), str(t), '1', '0', "out3CLShared.txt", str(seed)],stdout=subprocess.DEVNULL,stderr=subprocess.STDOUT)
