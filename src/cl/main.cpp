@@ -3,7 +3,7 @@
 #ifdef __APPLE__
 #include <OpenCL/opencl.hpp>
 #else
-#include <CL/opencl.hpp>
+#include <OpenCL/opencl.hpp>
 #endif  // DEBUG
 #include <chrono>
 #include <fstream>
