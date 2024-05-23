@@ -5,36 +5,14 @@ kernel void vec_sum(global int *a, global int *b, global int *c, int N) {
   }
 }
 
-kernel cl_double3 batch_calculation(cl_double4 pos, cl_double3 acc, cl_double4* data, int bsize){
-  double r;
-  for (int i = 0; i < get_group_id(0); i++){
-    r = data[i];
-    r.x = r.x - pos.x;
-    r.y = r.y - pos.y;
-    r.z = r.z - pos.z;
-
-    double distSqr = r.x * r.x + r.y * r.y + r.z * r.z + 0.1;
-    double dist = std::sqrt(distSqrr);
-    double distCube = dist * dist * dist;
-    double s = r.w / distCube;
-
-    acc.x = acc.x + r.x * s;
-    acc.y = acc.y + r.y * s;
-    acc.z = acc.z + r.z * s;
-  }
-  return acc;
-}
-
-extern __shared__ cl_double4 batchData[];
-
-kernel void nbody_kernel(int n, cl_double4 *posData, cl_double4 *posAux, cl_double4 *velData, cl_double4 *velAux) {
+kernel void nbody_kernel(int n, global double4 *posData, global double4 *posAux, global double4 *velData, global double4 *velAux) {
   unsigned int index = get_global_id(0);
 
-  cl_double4 pos = posData[index];
-  cl_double4 vel = velData[index];
+  double4 pos = posData[index];
+  double4 vel = velData[index];
 
-  cl_double4 r;
-  cl_double3 acc = {0,0,0};
+  double4 r;
+  double3 acc = {0,0,0};
 
   for (int i = 0; i < n; i++){
 
@@ -44,7 +22,7 @@ kernel void nbody_kernel(int n, cl_double4 *posData, cl_double4 *posAux, cl_doub
     r.z = r.z - pos.z;
 
     double distSqr = r.x * r.x + r.y * r.y + r.z * r.z + 0.1;
-    double dsit = std::sqrt(distSqr);
+    double dist = sqrt(distSqr);
     double distCube = dist * dist * dist;
     double s = r.w / distCube;
 
@@ -65,17 +43,17 @@ kernel void nbody_kernel(int n, cl_double4 *posData, cl_double4 *posAux, cl_doub
   velAux[index] = vel;
 };
 
-kernel void nbody_kernel_2D(int n, cl_double4 *posData, cl_double4 *posAux, cl_double4 *velData, cl_double4 *velAux, int nx){
+kernel void nbody_kernel_2D(int n, global double4 *posData, global double4 *posAux, global double4 *velData, global double4 *velAux, int nx){
 
   unsigned int index_x = get_global_id(0);
   unsigned int index_y = get_global_id(1);
   unsigned int index = index_x + index_y * nx;
 
-  cl_double4 pos = posData[index];
-  cl_double4 vel = velData[index];
+  double4 pos = posData[index];
+  double4 vel = velData[index];
 
-  cl_double4 r;
-  cl_double4 acc;
+  double4 r;
+  double3 acc = {0,0,0};
 
   for (int i = 0; i < n; i++){
 
@@ -85,7 +63,7 @@ kernel void nbody_kernel_2D(int n, cl_double4 *posData, cl_double4 *posAux, cl_d
     r.z = r.z - pos.z;
 
     double distSqr = r.x * r.x + r.y * r.y + r.z * r.z + 0.1;
-    double dsit = std::sqrt(distSqr);
+    double dist = sqrt(distSqr);
     double distCube = dist * dist * dist;
     double s = r.w / distCube;
 
@@ -106,27 +84,30 @@ kernel void nbody_kernel_2D(int n, cl_double4 *posData, cl_double4 *posAux, cl_d
   velAux[index] = vel;
 };
 
-__global__ void nbody_kernel_shared(int n, cl_double4 *posData, cl_double4 *posAux, cl_double4 *velData, cl_double4 *velAux, int bsize, int bnum) {
+kernel void nbody_kernel_shared(int n, global double4 *posData, global double4 *posAux, global double4 *velData, global double4 *velAux, local double4 *batchData, int bnum) {
 
   unsigned int index = get_global_id(0);
-  cl_double4 pos = posData[index];
-  cl_double4 vel = velData[index];
+  unsigned int l_index = get_local_id(0);
+  unsigned int l_size = get_local_size(0);
 
-  cl_double3 acc = {0,0,0};
+  double4 pos = posData[index];
+  double4 vel = velData[index];
+
+  double3 acc = {0,0,0};
 
   for (int i = 0; i < bnum; i++) {
 
-    batchData[threadIdx.x] = posData[threadIdx.x + i * blockDim.x];
-    barrier();
+    batchData[l_index] = posData[l_index + i * l_size];
+    barrier(CLK_LOCAL_MEM_FENCE);
 
-    for (int i = 0; i < blockDim.x; i++) {
-      cl_double4 r = batchData[i];
+    for (int i = 0; i < l_size; i++) {
+      double4 r = batchData[i];
       r.x = r.x - pos.x;
       r.y = r.y - pos.y;
       r.z = r.z - pos.z;
 
       double distSqr = r.x * r.x + r.y * r.y + r.z * r.z + 0.1;
-      double dist = std::sqrt(distSqr);
+      double dist = sqrt(distSqr);
       double distCube = dist * dist * dist;
       double s = r.w / distCube;
 
@@ -134,7 +115,7 @@ __global__ void nbody_kernel_shared(int n, cl_double4 *posData, cl_double4 *posA
       acc.y = acc.y + r.y * s;
       acc.z = acc.z + r.z * s;
     }
-    barrier();
+    barrier(CLK_LOCAL_MEM_FENCE);
   }
 
   vel.x = vel.x + acc.x;

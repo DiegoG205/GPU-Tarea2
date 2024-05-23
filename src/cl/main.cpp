@@ -186,7 +186,7 @@ bool simulate(int N, int Steps, int blockSize, int sharedMem, int threads2D, int
         kernel.setArg(2, auxPosDev);
         kernel.setArg(3, velDev);
         kernel.setArg(4, auxVelDev);
-        kernel.setArg(5, blockSize);
+        kernel.setArg(5, NULL);
         kernel.setArg(6, gridSize);
 
         // Execute the function on the device (using 32 threads here)
