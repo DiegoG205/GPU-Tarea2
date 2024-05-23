@@ -338,6 +338,9 @@ bool simulate_default(int N, int localSize, int globalSize) {
 }
 
 int main(int argc, char* argv[]) {
+  
+  if (!init()) return 1;
+
   if (argc != 7 && argc != 8) {
     std::cerr << "Uso: " << argv[0] << " <particle_count> <step_count> <block size> <shared_mem> <2d_threads> <output_file> <seed (optional)>"
               << std::endl;

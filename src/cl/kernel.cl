@@ -32,6 +32,8 @@ extern __shared__ cl_double4 batchData[];
 kernel void nbody_kernel(int n, cl_double4 *posData, cl_double4 *posAux, cl_double4 *velData, cl_double4 *velAux) {
   unsigned int index = get_global_id(0);
 
+  printf("%d\n", index);
+
   cl_double4 pos = posData[index];
   cl_double4 vel = velData[index];
 
